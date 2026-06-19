@@ -69,7 +69,10 @@ const RatMazeApp = (() => {
   function bindEvents() {
     dom.mode.addEventListener('change', () => {
       toggleDepthInput();
-      // no special preset behavior; just regenerate
+      // if in Random mode, recompute a sensible default blocked count
+      if (dom.mazeType.value === 'random') {
+        setDefaultBlockedForRandom();
+      }
       generateMaze();
     });
 
@@ -83,6 +86,10 @@ const RatMazeApp = (() => {
       dom.sizeInput.disabled = false;
       dom.depthInput.disabled = false;
       dom.blockedInput.disabled = mazeType !== 'random';
+
+      if (mazeType === 'random') {
+        setDefaultBlockedForRandom();
+      }
 
       generateMaze();
     });
@@ -134,6 +141,22 @@ const RatMazeApp = (() => {
     dom.blockedInput.value = blocked;
 
     return { blocked };
+  }
+
+  function computeDefaultBlocked() {
+    const totalCells = depth * size * size;
+    // default to ~20% of cells, at least 1, but leave room for source/destination
+    const def = Math.max(1, Math.floor(totalCells * 0.2));
+    return Math.min(def, Math.max(0, totalCells - 2));
+  }
+
+  function setDefaultBlockedForRandom() {
+    // ensure size/depth are up to date
+    size = clamp(Number(dom.sizeInput.value), 3, 10);
+    depth = dom.mode.value === '3d' ? clamp(Number(dom.depthInput.value), 2, 5) : 1;
+    const def = computeDefaultBlocked();
+    dom.blockedInput.value = def;
+    dom.blockedInput.disabled = false;
   }
 
   function clamp(value, min, max) {
