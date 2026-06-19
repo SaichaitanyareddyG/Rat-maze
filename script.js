@@ -7,8 +7,7 @@ const RatMazeApp = (() => {
     OPEN: 0,
     WALL: 1,
     VISITED: 2,
-    BACKTRACKED: 3,
-    PATH: 4
+    BACKTRACKED: 3
   };
 
   // For 2D matrix: maze[row][col]
@@ -54,6 +53,7 @@ const RatMazeApp = (() => {
   let isRunning = false;
   let isPaused = false;
   let shouldStop = false;
+  let activeRunId = 0;
   const STEP_DELAY = 2000; // 2000ms = 2 seconds per step
 
 
@@ -63,6 +63,7 @@ const RatMazeApp = (() => {
     // default to manual mode
     dom.mazeType.value = 'manual';
     mazeType = 'manual';
+    applyMazeTypeSettings();
     generateMaze();
   }
 
@@ -78,19 +79,7 @@ const RatMazeApp = (() => {
 
     dom.mazeType.addEventListener('change', () => {
       mazeType = dom.mazeType.value;
-      // show/hide manual instructions and block controls
-      dom.manualInstructions.style.display =
-        mazeType === 'manual' ? 'block' : 'none';
-
-      // Manual: user clicks to build walls; Random: allow blocked input
-      dom.sizeInput.disabled = false;
-      dom.depthInput.disabled = false;
-      dom.blockedInput.disabled = mazeType !== 'random';
-
-      if (mazeType === 'random') {
-        setDefaultBlockedForRandom();
-      }
-
+      applyMazeTypeSettings();
       generateMaze();
     });
 
@@ -117,6 +106,21 @@ const RatMazeApp = (() => {
   function toggleDepthInput() {
     dom.depthField.style.display =
       dom.mode.value === '3d' ? 'block' : 'none';
+  }
+
+  function applyMazeTypeSettings() {
+    dom.manualInstructions.style.display =
+      mazeType === 'manual' ? 'block' : 'none';
+
+    dom.sizeInput.disabled = false;
+    dom.depthInput.disabled = false;
+    dom.blockedInput.disabled = mazeType !== 'random';
+
+    if (mazeType === 'random') {
+      setDefaultBlockedForRandom();
+    } else {
+      dom.blockedInput.value = 0;
+    }
   }
 
   function readConfig() {
@@ -166,6 +170,7 @@ const RatMazeApp = (() => {
 
   function generateMaze() {
     shouldStop = true;
+    activeRunId += 1;
     isRunning = false;
     isPaused = false;
 
@@ -191,14 +196,6 @@ const RatMazeApp = (() => {
     renderMaze();
 
     setStatus('Maze generated. Click Start to begin.');
-  }
-
-  function loadFigmaPresetMaze() {
-    // removed: Figma preset no longer supported
-    size = 5;
-    depth = 1;
-    maze = createEmptyMaze();
-    updateBlockedCountFromMaze();
   }
 
   function generateSolvableRandomMaze(blockedCount) {
@@ -466,10 +463,6 @@ const RatMazeApp = (() => {
       return 'backtracked';
     }
 
-    if (value === CELL.PATH) {
-      return 'final-path';
-    }
-
     return '';
   }
 
@@ -492,12 +485,18 @@ const RatMazeApp = (() => {
     return '';
   }
 
+  function isRunCancelled(runId) {
+    return shouldStop || runId !== activeRunId;
+  }
+
   async function startSolving() {
     if (isRunning) return;
 
     shouldStop = false;
     isPaused = false;
     isRunning = true;
+
+    const runId = ++activeRunId;
 
     dom.startBtn.disabled = true;
     dom.pauseBtn.disabled = false;
@@ -506,19 +505,14 @@ const RatMazeApp = (() => {
     resetFinalPath();
     resetVisitedCells();
 
-    setStatus(
-      'Rat started moving...'
-    );
+    setStatus('Rat started moving...');
 
-    const solved = await solve(
-      getSource(),
-      []
-    );
+    const solved = await solve(getSource(), [], runId);
     isRunning = false;
     dom.startBtn.disabled = false;
     dom.pauseBtn.disabled = true;
 
-    if (shouldStop) {
+    if (isRunCancelled(runId)) {
       setStatus('Maze reset.');
       return;
     }
@@ -539,10 +533,11 @@ const RatMazeApp = (() => {
     }
   }
 
-  async function solve(point, path) {
-    if (shouldStop) return false;
+  async function solve(point, path, runId) {
+    if (isRunCancelled(runId)) return false;
 
     await waitIfPaused();
+    if (isRunCancelled(runId)) return false;
 
     if (!isValidMove(point)) {
       return false;
@@ -563,11 +558,13 @@ const RatMazeApp = (() => {
         : DIRECTIONS_2D;
 
     for (const direction of directions) {
-      const nextPoint = getNextPoint(point, direction);
+      if (isRunCancelled(runId)) return false;
 
+      const nextPoint = getNextPoint(point, direction);
       const foundPath = await solve(
         nextPoint,
-        [...path, point]
+        [...path, point],
+        runId
       );
 
       if (foundPath) {
@@ -579,6 +576,7 @@ const RatMazeApp = (() => {
       setCell(point, CELL.BACKTRACKED);
       renderMaze(point);
       await delay(STEP_DELAY);
+      if (isRunCancelled(runId)) return false;
     }
 
     return false;
@@ -797,6 +795,11 @@ const RatMazeApp = (() => {
 
   function restartMaze() {
     shouldStop = true;
+    activeRunId += 1;
+
+    // Restart can happen while the solver is waiting inside await delay(STEP_DELAY).
+    // Because STEP_DELAY is 2 seconds, old async recursion may wake up later.
+    // activeRunId prevents that old recursion from updating the new maze state.
     setTimeout(generateMaze, 100);
   }
 
