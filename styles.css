@@ -186,8 +186,8 @@ button:disabled {
   background: #ffffff;
   color: #111827;
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   padding: 6px;
   font-size: 16px;
   font-weight: 900;
@@ -243,8 +243,9 @@ button:disabled {
 .destination,
 .current {
   font-weight: 900;
-  font-size: 18px;
+  font-size: 22px;
   text-align: center;
+  line-height: 1;
 }
 
 .visited {
@@ -293,7 +294,7 @@ button:disabled {
   }
 
   .cell {
-    font-size: 12px;
+    font-size: 14px;
     padding: 4px;
   }
 }
