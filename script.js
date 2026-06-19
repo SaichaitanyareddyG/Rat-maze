@@ -54,7 +54,7 @@ const RatMazeApp = (() => {
   let isRunning = false;
   let isPaused = false;
   let shouldStop = false;
-  const STEP_DELAY = 250;
+  const STEP_DELAY = 2000; // 2000ms = 2 seconds per step
 
   const FIGMA_2D_MAZE = [
     [0, 1, 0, 0, 0],
