@@ -273,8 +273,7 @@ const RatMazeApp = (() => {
       const point = getRandomPoint();
 
       if (
-        isSource(point) ||
-        isDestination(point) ||
+        isTerminalPoint(point) ||
         getCell(point) === CELL.WALL
       ) {
         continue;
@@ -327,6 +326,10 @@ const RatMazeApp = (() => {
       a.row === b.row &&
       a.col === b.col
     );
+  }
+
+  function isTerminalPoint(point) {
+    return isSource(point) || isDestination(point);
   }
 
   function getCell(point) {
@@ -434,19 +437,28 @@ const RatMazeApp = (() => {
   }
 
   function getCellClass(point, currentPoint) {
-    if (
-      currentPoint &&
-      isSamePoint(point, currentPoint)
-    ) {
-      return 'current';
+    const isCurrent = currentPoint && isSamePoint(point, currentPoint);
+    const isSourcePoint = isSource(point);
+    const isDestinationPoint = isDestination(point);
+
+    if (isSourcePoint && isCurrent) {
+      return 'source current';
     }
 
-    if (isSource(point)) {
+    if (isDestinationPoint && isCurrent) {
+      return 'destination current';
+    }
+
+    if (isSourcePoint) {
       return 'source';
     }
 
-    if (isDestination(point)) {
+    if (isDestinationPoint) {
       return 'destination';
+    }
+
+    if (isCurrent) {
+      return 'current';
     }
 
     const value = getCell(point);
@@ -572,7 +584,7 @@ const RatMazeApp = (() => {
       }
     }
 
-    if (!isSource(point) && !isDestination(point)) {
+    if (!isTerminalPoint(point)) {
       setCell(point, CELL.BACKTRACKED);
       renderMaze(point);
       await delay(STEP_DELAY);
