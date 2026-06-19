@@ -145,6 +145,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 18px;
   align-items: flex-start;
+  justify-content: center;
 }
 
 .layer-card {
@@ -235,6 +236,15 @@ button:disabled {
   background: #facc15;
   color: #111827;
   transform: scale(1.08);
+}
+
+/* Ensure S, D, and R are bold and readable */
+.source,
+.destination,
+.current {
+  font-weight: 900;
+  font-size: 18px;
+  text-align: center;
 }
 
 .visited {
