@@ -218,6 +218,19 @@ button:disabled {
   color: #ffffff;
 }
 
+/* Ensure wall cells have black borders so they appear fully black */
+.cell.wall {
+  background: #000000 !important;
+  color: #ffffff;
+  border-right: 2px solid #000000;
+  border-bottom: 2px solid #000000;
+}
+
+/* Legend small box for wall should also show pure black border */
+.box.wall {
+  border: 1px solid #000000;
+}
+
 .current {
   background: #facc15;
   color: #111827;

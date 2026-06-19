@@ -372,7 +372,7 @@ const RatMazeApp = (() => {
 
       title.textContent =
         mode === '3d'
-          ? `Layer ${layer + 1}`
+          ? `3D Matrix — Layer ${layer + 1}`
           : '2D Matrix';
 
       layerCard.appendChild(title);

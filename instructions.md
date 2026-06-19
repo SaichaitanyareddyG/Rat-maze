@@ -1,261 +1,209 @@
-Pull the latest main branch from:
-https://github.com/SaichaitanyareddyG/Rat-maze
 
-You are a senior vanilla JavaScript frontend developer. The app is mostly working now. Do NOT rewrite the whole project. Fix only the remaining UI polish and interactivity issues.
+Please review the entire repository and current pull-request changes before making any decision.
 
-Current state:
-- Maze Type exists: Figma Preset, Manual, Random Solvable.
-- Mode exists: 2D Matrix, 3D Matrix Bonus.
-- Source/Destination now display as S and D.
-- Walls are black.
-- Final path is SVG orange polyline.
-- DFS/backtracking algorithm is already working.
-- 3D mode exists as layered matrices.
-- Keep all of this.
+Goal:
+Implement and verify the 3D Rat Maze feature properly, clean up unwanted code, optimize the logic, add proper comments, and improve visualization delay.
 
-Fix only these remaining issues:
+Main requirement:
+The maze should be converted from a 2D N x N grid into a 3D N x N x N grid.
 
-1. Fix the orange arrow size.
+The rat position must use 3D coordinates:
 
-The current arrowhead is too large. In drawPathOverlay(), replace the current marker setup.
+{
+  x: number,
+  y: number,
+  z: number
+}
 
-Do NOT use:
-marker.setAttribute('markerUnits', 'strokeWidth');
+From each cell, the rat must support exactly 6 possible directions:
 
-Use fixed marker sizing:
+1. Up
+2. Down
+3. Left
+4. Right
+5. Forward - next layer
+6. Backward - previous layer
 
-marker.setAttribute('markerUnits', 'userSpaceOnUse');
-marker.setAttribute('markerWidth', '14');
-marker.setAttribute('markerHeight', '14');
-marker.setAttribute('viewBox', '0 0 14 14');
-marker.setAttribute('refX', '12');
-marker.setAttribute('refY', '7');
-marker.setAttribute('orient', 'auto');
+Use a centralized directions array, for example:
 
-pathArrow.setAttribute('d', 'M1,1 L13,7 L1,13 Z');
+const directions3D = [
+  { dx: -1, dy: 0, dz: 0, name: "UP" },
+  { dx: 1, dy: 0, dz: 0, name: "DOWN" },
+  { dx: 0, dy: -1, dz: 0, name: "LEFT" },
+  { dx: 0, dy: 1, dz: 0, name: "RIGHT" },
+  { dx: 0, dy: 0, dz: 1, name: "FORWARD" },
+  { dx: 0, dy: 0, dz: -1, name: "BACKWARD" },
+];
+
+Please cross-check all files and confirm that old 2D-only logic is fully updated wherever required.
+
+Check these areas carefully:
+
+1. Maze generation
+- Maze should be generated as N x N x N.
+- Coordinate usage must be consistent everywhere.
+- Use one convention only, such as maze[z][x][y] or maze[x][y][z].
+- Add a comment explaining the chosen coordinate convention.
+
+2. Solver/pathfinding
+- Solver must use x, y, z coordinates.
+- Boundary checks must validate x, y, and z.
+- Visited tracking must support 3D positions.
+- Avoid using only row/column logic.
+- Forward and backward movement between layers must work.
+- Path should store full 3D coordinates.
+
+3. UI/visualization
+- UI should clearly support 3D maze visualization.
+- If full 3D rendering is not available, provide a layer-by-layer view or layer selector.
+- Current layer, source, destination, rat position, visited cells, and final path should be clear.
+
+4. Movement delay
+Add a 2-second delay for every rat movement to make the visualization better.
 
 Use:
-poly.setAttribute('stroke-width', '4');
 
-The arrow should be small and clean. It must not cover the D cell.
+const STEP_DELAY = 2000;
 
-2. Fix double/thick grid borders.
+Every movement/update should wait using:
 
-Right now .grid has border and every .cell has full border. This creates double-thick internal lines.
+await delay(STEP_DELAY);
 
-Change CSS to border-collapse style:
+5. Restart race condition
+Current restart logic is:
 
-.grid {
-  --cell-size: 52px;
-  display: grid;
-  grid-template-columns: repeat(var(--maze-size), var(--cell-size));
-  gap: 0;
-  width: fit-content;
-  max-width: 100%;
-  overflow: visible;
-  position: relative;
-  border-top: 2px solid #111827;
-  border-left: 2px solid #111827;
+function restartMaze() {
+  shouldStop = true;
+  setTimeout(generateMaze, 100);
 }
 
-.cell {
-  width: var(--cell-size);
-  height: var(--cell-size);
-  border: 0;
-  border-right: 2px solid #111827;
-  border-bottom: 2px solid #111827;
-  border-radius: 0;
-  background: #ffffff;
-  color: #111827;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 6px;
-  font-size: 16px;
-  font-weight: 900;
-  line-height: 1;
-  position: relative;
-  z-index: 1;
-  user-select: none;
+Because STEP_DELAY is now 2 seconds, clicking Restart while the rat is inside await delay(STEP_DELAY) means the old recursive traversal will not see shouldStop = true until the 2-second timer finishes.
+
+The UI may reset after generateMaze runs, but the old recursive loop can still wake up once in the background before stopping.
+
+In this implementation it may not visibly break the UI because generateMaze resets state and the old loop may exit on the next shouldStop check, but it is still a race condition.
+
+Please fix this by using a run id / cancellation token so old async recursion cannot update the new maze after Restart.
+
+Example approach:
+
+let shouldStop = false;
+let activeRunId = 0;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-Remove this old style:
-.grid { border: 2px solid #111827; }
-.cell { border: 1px solid #111827; }
-
-3. Stop setting fixed grid columns in JavaScript.
-
-Currently renderMaze() uses:
-grid.style.gridTemplateColumns = `repeat(${size}, 52px)`;
-
-Replace it with:
-grid.style.setProperty('--maze-size', size);
-
-Let CSS control the cell size.
-
-This is important because mobile CSS changes cell size, but JS is still forcing 52px columns.
-
-4. Fix mobile sizing.
-
-Add:
-
-@media (max-width: 760px) {
-  .grid {
-    --cell-size: 38px;
-  }
-
-  .cell {
-    font-size: 12px;
-    padding: 4px;
-  }
+function isRunCancelled(runId) {
+  return shouldStop || runId !== activeRunId;
 }
 
-Do not set width/height directly in the mobile .cell rule if CSS variable is used.
+When starting the solver:
 
-5. Make maze card fit the grid.
-
-Current card has too much empty white space.
-
-Change:
-
-.maze-wrapper {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  align-items: flex-start;
+async function startSolvingMaze() {
+  shouldStop = false;
+  const runId = ++activeRunId;
+  await solveMaze(startX, startY, startZ, runId);
 }
 
-.layer-card {
-  width: fit-content;
-  max-width: 100%;
-}
+Inside recursive solver, check cancellation before and after delay:
 
-Keep the card design, but do not let the maze area stretch huge.
+async function solveMaze(x, y, z, runId) {
+  if (isRunCancelled(runId)) return false;
 
-6. Show the rat during animation.
+  markRatPosition(x, y, z);
 
-Currently getCellLabel() returns empty string for the current point.
+  await delay(STEP_DELAY);
 
-Change:
+  // Restart may happen while delay is pending.
+  // Do not allow old recursion to continue after restart.
+  if (isRunCancelled(runId)) return false;
 
-function getCellLabel(point, currentPoint) {
-  if (currentPoint && isSamePoint(point, currentPoint)) {
-    return 'R';
-  }
-  if (isSource(point)) return 'S';
-  if (isDestination(point)) return 'D';
-  return '';
-}
+  for (const direction of directions3D) {
+    if (isRunCancelled(runId)) return false;
 
-Use R instead of emoji if emoji causes alignment issues.
+    const nextX = x + direction.dx;
+    const nextY = y + direction.dy;
+    const nextZ = z + direction.dz;
 
-7. Add live blocked-node count.
-
-Manual mode should update Blocked Nodes count whenever user selects/deselects walls.
-
-Add:
-
-function countWalls() {
-  let count = 0;
-  forEachPoint((point) => {
-    if (getCell(point) === CELL.WALL) {
-      count += 1;
+    if (isValidMove(nextX, nextY, nextZ)) {
+      const found = await solveMaze(nextX, nextY, nextZ, runId);
+      if (found) return true;
     }
-  });
-  return count;
+  }
+
+  return false;
 }
 
-function updateBlockedCountFromMaze() {
-  dom.blockedInput.value = countWalls();
+Update restart logic:
+
+function restartMaze() {
+  shouldStop = true;
+
+  // Invalidate currently running async solver immediately.
+  // This prevents old recursion from updating the new maze after restart.
+  activeRunId++;
+
+  setTimeout(generateMaze, 100);
 }
 
-Call updateBlockedCountFromMaze() after:
-- loadFigmaPresetMaze()
-- generateSolvableRandomMaze()
-- toggleManualWall()
-- generateMaze() after maze is created
+Add this comment near restart logic:
 
-Expected:
-- Figma Preset shows 9 blocked nodes.
-- Manual mode blocked count updates live.
-- Random Solvable shows actual generated wall count.
+// Restart can happen while the solver is waiting inside await delay(STEP_DELAY).
+// Because STEP_DELAY is 2 seconds, the old async recursion may wake up later.
+// activeRunId prevents that old recursion from updating the new maze state.
 
-8. Manual mode should keep Blocked Nodes disabled but visible.
+6. Code cleanup
+Please remove:
+- Unused imports
+- Unused variables
+- Dead helper functions
+- Duplicate 2D solver logic
+- Old row/column-only code
+- Unnecessary console logs
+- Hardcoded movement logic
+- Any commented-out old code
 
-In Manual mode:
-- blockedInput.disabled = true
-- value updates live using updateBlockedCountFromMaze()
-- user should not type blocked count manually in Manual mode
-- clicking cells is the source of truth
+7. Optimization
+Please optimize:
+- Use a centralized directions3D array.
+- Avoid repeated code for each movement direction.
+- Avoid unnecessary deep cloning during each recursive step.
+- Prefer push/pop path backtracking or efficient state updates.
+- If recursion depth can become large, consider iterative DFS/BFS.
+- Keep state updates minimal to avoid unnecessary re-renders.
 
-9. Remove duplicate render in manual click.
+8. Comments
+Add proper comments only where useful:
+- Explain coordinate convention.
+- Explain 6-direction 3D movement.
+- Explain STEP_DELAY.
+- Explain restart cancellation / activeRunId.
+- Do not add obvious comments for simple syntax.
 
-Currently the click handler calls toggleManualWall(point), and toggleManualWall() already calls renderMaze().
+9. Tests / manual verification
+Please verify these cases:
+- Rat can move up/down/left/right in the same layer.
+- Rat can move forward to next layer.
+- Rat can move backward to previous layer.
+- Rat cannot move outside x/y/z boundaries.
+- Rat cannot move through blocked cells.
+- Rat reaches destination when valid path exists.
+- Proper no-path handling when destination is unreachable.
+- Restart during the 2-second delay does not allow old recursion to update the new maze.
+- Multiple restarts do not create background solver conflicts.
 
-Keep render in only one place.
+Final expected result:
+After checking all repository files, confirm whether 3D maze is fully implemented or not.
 
-Recommended:
-- toggleManualWall() should call resetFinalPath(), updateBlockedCountFromMaze(), renderMaze()
-- event handler should only call toggleManualWall(point)
+If not fully implemented, update the code properly.
 
-10. Clear old final path when starting again.
-
-At the beginning of startSolving(), before resetVisitedCells(), add:
-
-resetFinalPath();
-
-So old orange line disappears before new animation starts.
-
-11. Keep final solved view clean.
-
-After successful solve:
-- clear VISITED and BACKTRACKED back to OPEN
-- keep WALL black
-- keep S and D orange
-- show orange polyline only
-- no blue final path cells
-
-Do not reintroduce CELL.PATH rendering.
-
-12. Keep 3D simple.
-
-Do not make a 3D cube.
-Keep 3D as layered matrix cards:
-- Layer 1
-- Layer 2
-- Layer 3
-
-Movement should remain:
-- left
-- right
-- up
-- down
-- layer forward
-- layer backward
-
-Do not draw orange lines between layer cards.
-Keep layer transition badges.
-
-13. Acceptance criteria:
-
-- Arrowhead is small and does not cover D.
-- Grid has no gaps.
-- Internal borders are single-width, not doubled.
-- Cells have no border radius.
-- Maze card fits the grid instead of taking huge width.
-- S and D are orange.
-- Rat/current cell shows R during animation.
-- Manual wall click visibly toggles black/white.
-- Manual Blocked Nodes count updates live.
-- Figma Preset Blocked Nodes shows 9.
-- Random Solvable walls are visible and count is correct.
-- Starting again clears previous orange path before animation.
-- Mobile grid stays aligned.
-- 3D layered mode still works.
-
-Only edit:
-- index.html
-- script.js
-- styles.css
-
-Keep vanilla JavaScript. Do not add libraries.
+Then provide a clear summary:
+- Files changed
+- What 3D changes were added
+- What unwanted code was removed
+- What optimization was done
+- What comments were added
+- How the 2-second movement delay works
+- How the restart race condition was fixed
+- Any remaining limitations
