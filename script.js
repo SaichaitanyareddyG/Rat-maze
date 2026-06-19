@@ -359,7 +359,7 @@ const RatMazeApp = (() => {
 
     if (solved) {
       renderMaze();
-      setStatus('Victory! Rat reached the destination.');
+      setStatus('🎉 Victory! Rat reached the destination successfully.');
     } else {
       renderMaze();
       setStatus('No path found. Try another maze.');
