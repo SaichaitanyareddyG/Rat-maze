@@ -160,32 +160,58 @@ button:disabled {
 
 .grid {
   display: grid;
-  gap: 0;
+  gap: 4px;
   width: fit-content;
-  border: 2px solid #111827;
+  max-width: 100%;
+  overflow: auto;
 }
 
 .cell {
-  width: 52px;
-  height: 52px;
-  border-radius: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
   border: 1px solid #111827;
   background: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.2s ease, transform 0.2s ease;
+  position: relative;
 }
 
 
 .source {
+  background: #ffffff;
+  color: #f97316;
+  font-size: 11px;
+  text-align: center;
+}
+
+.destination {
+  background: #ffffff;
+  color: #f97316;
+  font-size: 11px;
+  text-align: center;
+}
+
+.source.alt {
   background: #22c55e;
   color: #ffffff;
 }
 
-.destination {
+.destination.alt {
   background: #ef4444;
   color: #ffffff;
 }
 
 .wall {
+<<<<<<< HEAD
   background: #252525;
+=======
+  background: #000000;
+>>>>>>> 821fcd9 (feat: Figma preset maze, Maze Type control, manual/random modes, SVG orange path overlay, 3D badges, and CSS updates)
   color: #ffffff;
 }
 
@@ -203,9 +229,27 @@ button:disabled {
   background: #d8b4fe;
 }
 
-.final-path {
-  background: #60a5fa;
-  color: #ffffff;
+/* final path is drawn as SVG overlay; do not color cells */
+
+.path-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.layer-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #f97316;
+  color: #fff;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  z-index: 10;
 }
 
 @media (max-width: 760px) {

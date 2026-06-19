@@ -31,10 +31,12 @@ const RatMazeApp = (() => {
 
   const dom = {
     mode: document.getElementById('mode'),
+    mazeType: document.getElementById('mazeType'),
     sizeInput: document.getElementById('sizeInput'),
     depthInput: document.getElementById('depthInput'),
     depthField: document.getElementById('depthField'),
     blockedInput: document.getElementById('blockedInput'),
+    manualInstructions: document.getElementById('manualInstructions'),
     generateBtn: document.getElementById('generateBtn'),
     startBtn: document.getElementById('startBtn'),
     pauseBtn: document.getElementById('pauseBtn'),
@@ -45,15 +47,28 @@ const RatMazeApp = (() => {
 
   let maze = [];
   let mode = '2d';
+  let mazeType = 'figma';
   let size = 5;
   let depth = 1;
+  let finalPath = [];
   let isRunning = false;
   let isPaused = false;
   let shouldStop = false;
 
+  const FIGMA_2D_MAZE = [
+    [0, 1, 0, 0, 0],
+    [0, 0, 0, 1, 0],
+    [0, 1, 1, 0, 0],
+    [0, 1, 1, 0, 1],
+    [0, 1, 1, 0, 0]
+  ];
+
   function init() {
     bindEvents();
     toggleDepthInput();
+    // default to figma preset
+    dom.mazeType.value = 'figma';
+    mazeType = 'figma';
     generateMaze();
   }
 
@@ -61,6 +76,43 @@ const RatMazeApp = (() => {
     dom.mode.addEventListener('change', () => {
       toggleDepthInput();
       generateMaze();
+    });
+
+    dom.mazeType.addEventListener('change', () => {
+      mazeType = dom.mazeType.value;
+      // show/hide manual instructions and block controls
+      dom.manualInstructions.style.display =
+        mazeType === 'manual' ? 'block' : 'none';
+
+      // Figma preset forces size 5 and single layer
+      if (mazeType === 'figma') {
+        dom.sizeInput.value = 5;
+        dom.sizeInput.disabled = true;
+        dom.depthInput.value = 1;
+        dom.depthInput.disabled = true;
+        dom.blockedInput.disabled = true;
+      } else {
+        dom.sizeInput.disabled = false;
+        dom.depthInput.disabled = false;
+        dom.blockedInput.disabled = mazeType !== 'random';
+      }
+
+      generateMaze();
+    });
+
+    // delegate clicks for manual wall toggling
+    dom.mazeWrapper.addEventListener('click', (ev) => {
+      if (mazeType !== 'manual') return;
+
+      const cell = ev.target.closest('.cell');
+      if (!cell) return;
+      const layer = Number(cell.dataset.layer);
+      const row = Number(cell.dataset.row);
+      const col = Number(cell.dataset.col);
+
+      const point = { layer, row, col };
+      toggleManualWall(point);
+      renderMaze();
     });
 
     dom.generateBtn.addEventListener('click', generateMaze);
@@ -113,14 +165,81 @@ const RatMazeApp = (() => {
 
     const { blocked } = readConfig();
 
-    maze = createEmptyMaze();
-    placeRandomWalls(blocked);
+    resetFinalPath();
+
+    if (mazeType === 'figma' && mode === '2d') {
+      loadFigmaPresetMaze();
+    } else if (mazeType === 'random') {
+      const ok = generateSolvableRandomMaze(blocked);
+      if (!ok) {
+        setStatus('Failed to generate a solvable maze. Try different options.');
+        return;
+      }
+    } else {
+      // manual or default empty
+      maze = createEmptyMaze();
+    }
 
     renderMaze();
 
-    setStatus(
-      'Maze generated. Click Start to begin.'
-    );
+    setStatus('Maze generated. Click Start to begin.');
+  }
+
+  function loadFigmaPresetMaze() {
+    size = 5;
+    depth = 1;
+    // deep copy into maze (layered format to keep 3D plumbing)
+    // keep 2D structure for 2D mode
+    maze = FIGMA_2D_MAZE.map((r) => r.slice());
+  }
+
+  function generateSolvableRandomMaze(blockedCount) {
+    const MAX_ATTEMPTS = 200;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      // create empty
+      maze = createEmptyMaze();
+      placeRandomWalls(blockedCount);
+
+      // quick non-animated solvability check
+      const path = solveForPath(getSource());
+      if (path) {
+        // keep this maze and mark finalPath now (but final overlay will be created on render)
+        finalPath = [];
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Non-animated DFS to check solvability and return path array or null
+  function solveForPath(start) {
+    const visited = new Set();
+    const stack = [[start, [start]]];
+
+    while (stack.length) {
+      const [point, path] = stack.pop();
+      const key = `${point.layer},${point.row},${point.col}`;
+      if (visited.has(key)) continue;
+      visited.add(key);
+
+      if (!isValidMove(point)) continue;
+
+      if (isDestination(point)) return path;
+
+      const directions = mode === '3d' ? DIRECTIONS_3D : DIRECTIONS_2D;
+
+      for (const dir of directions) {
+        const next = getNextPoint(point, dir);
+        const nextKey = `${next.layer},${next.row},${next.col}`;
+        if (!visited.has(nextKey)) {
+          stack.push([next, [...path, next]]);
+        }
+      }
+    }
+
+    return null;
   }
 
   function createEmptyMaze() {
@@ -227,6 +346,7 @@ const RatMazeApp = (() => {
     for (let layer = 0; layer < depth; layer += 1) {
       const layerCard = document.createElement('div');
       layerCard.className = 'layer-card';
+      layerCard.dataset.layer = layer;
 
       const title = document.createElement('h2');
       title.className = 'layer-title';
@@ -240,6 +360,10 @@ const RatMazeApp = (() => {
 
       const grid = document.createElement('div');
       grid.className = 'grid';
+      grid.dataset.layer = layer;
+
+      // position relative so overlay can be absolute
+      grid.style.position = 'relative';
 
       // Better responsive sizing
       grid.style.gridTemplateColumns =
@@ -256,18 +380,55 @@ const RatMazeApp = (() => {
 
           const cell = document.createElement('div');
 
-          cell.className =
-            `cell ${getCellClass(point, currentPoint)}`;
+          cell.className = `cell ${getCellClass(point, currentPoint)}`;
+          cell.dataset.layer = layer;
+          cell.dataset.row = row;
+          cell.dataset.col = col;
 
-          cell.textContent =
-            getCellLabel(point, currentPoint);
+          cell.textContent = getCellLabel(point, currentPoint);
 
           grid.appendChild(cell);
         }
       }
 
+      // append grid first then overlay
       layerCard.appendChild(grid);
+
+      // create SVG overlay placeholder
+      const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      overlay.classList.add('path-overlay');
+      overlay.setAttribute('width', '100%');
+      overlay.setAttribute('height', '100%');
+      overlay.setAttribute('preserveAspectRatio', 'none');
+
+      layerCard.appendChild(overlay);
+
       dom.mazeWrapper.appendChild(layerCard);
+
+      // draw the path for this layer if available
+      const layerPath = getLayerPath(finalPath, layer);
+      drawPathOverlay(grid, overlay, layerPath);
+
+      // render layer transition badges for 3D paths
+      if (finalPath && finalPath.length > 1) {
+        for (let i = 0; i < finalPath.length - 1; i += 1) {
+          const a = finalPath[i];
+          const b = finalPath[i + 1];
+          if (a.layer !== b.layer && a.layer === layer) {
+            // badge to indicate transition to layer b.layer
+            const cells = Array.from(grid.querySelectorAll('.cell'));
+            const idx = a.row * size + a.col;
+            const cellEl = cells[idx];
+            if (cellEl) {
+              const badge = document.createElement('div');
+              badge.className = 'layer-badge';
+              const arrow = b.layer > a.layer ? '↓' : '↑';
+              badge.textContent = `${arrow} Layer ${b.layer + 1}`;
+              cellEl.appendChild(badge);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -280,11 +441,11 @@ const RatMazeApp = (() => {
     }
 
     if (isSource(point)) {
-      return 'source';
+      return mazeType === 'figma' ? 'source' : 'source alt';
     }
 
     if (isDestination(point)) {
-      return 'destination';
+      return mazeType === 'figma' ? 'destination' : 'destination alt';
     }
 
     const value = getCell(point);
@@ -317,11 +478,11 @@ const RatMazeApp = (() => {
     }
 
     if (isSource(point)) {
-      return 'S';
+      return mazeType === 'figma' ? 'SOURCE' : 'S';
     }
 
     if (isDestination(point)) {
-      return 'D';
+      return mazeType === 'figma' ? 'DESTINATION' : 'D';
     }
 
     return '';
@@ -358,6 +519,13 @@ const RatMazeApp = (() => {
     }
 
     if (solved) {
+      // clear transient visited/backtracked states, keep finalPath overlay
+      forEachPoint((point) => {
+        const v = getCell(point);
+        if ([CELL.VISITED, CELL.BACKTRACKED].includes(v)) {
+          setCell(point, CELL.OPEN);
+        }
+      });
       renderMaze();
       setStatus('🎉 Victory! Rat reached the destination successfully.');
     } else {
@@ -453,11 +621,8 @@ const RatMazeApp = (() => {
     );
   }
   function markFinalPath(path) {
-    path.forEach((point) => {
-      if (!isSource(point) && !isDestination(point)) {
-        setCell(point, CELL.PATH);
-      }
-    });
+    // store the final path for overlay rendering; do not mutate cell states
+    finalPath = path.slice();
   }
 
   function resetVisitedCells() {
@@ -465,17 +630,92 @@ const RatMazeApp = (() => {
       const value = getCell(point);
 
       if (
-        [
-          CELL.VISITED,
-          CELL.BACKTRACKED,
-          CELL.PATH
-        ].includes(value)
+        [CELL.VISITED, CELL.BACKTRACKED].includes(value)
       ) {
         setCell(point, CELL.OPEN);
       }
     });
 
     renderMaze();
+  }
+
+  function resetFinalPath() {
+    finalPath = [];
+  }
+
+  function getLayerPath(path, layer) {
+    if (!path || !path.length) return [];
+    return path.filter((p) => p.layer === layer);
+  }
+
+  function toggleManualWall(point) {
+    if (isSource(point) || isDestination(point)) return;
+
+    const cur = getCell(point);
+    if (cur === CELL.WALL) {
+      setCell(point, CELL.OPEN);
+    } else {
+      setCell(point, CELL.WALL);
+    }
+  }
+
+  function drawPathOverlay(grid, svg, pathPoints) {
+    // clear existing
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    if (!pathPoints || pathPoints.length === 0) return;
+
+    // map points to center coordinates relative to grid
+    const rect = grid.getBoundingClientRect();
+    const cells = Array.from(grid.querySelectorAll('.cell'));
+
+    const coords = pathPoints.map((p) => {
+      const idx = p.row * size + p.col;
+      const el = cells[idx];
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: r.left - rect.left + r.width / 2,
+        y: r.top - rect.top + r.height / 2
+      };
+    }).filter(Boolean);
+
+    if (coords.length < 2) return;
+
+    // convert to SVG viewBox coordinates
+    const w = rect.width || grid.clientWidth || 300;
+    const h = rect.height || grid.clientHeight || 300;
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.style.width = `${w}px`;
+    svg.style.height = `${h}px`;
+
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', 'arrow');
+    marker.setAttribute('markerWidth', '10');
+    marker.setAttribute('markerHeight', '10');
+    marker.setAttribute('refX', '8');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('orient', 'auto');
+    const pathArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pathArrow.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+    pathArrow.setAttribute('fill', '#f97316');
+    marker.appendChild(pathArrow);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('fill', 'none');
+    poly.setAttribute('stroke', '#f97316');
+    poly.setAttribute('stroke-width', '6');
+    poly.setAttribute('stroke-linecap', 'round');
+    poly.setAttribute('stroke-linejoin', 'round');
+    poly.setAttribute('marker-end', 'url(#arrow)');
+
+    const pointsAttr = coords.map((c) => `${c.x},${c.y}`).join(' ');
+    poly.setAttribute('points', pointsAttr);
+
+    svg.appendChild(poly);
   }
 
   function forEachPoint(callback) {

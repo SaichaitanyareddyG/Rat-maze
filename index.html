@@ -27,6 +27,15 @@
 
     <section class="panel controls-panel">
       <div class="field">
+        <label for="mazeType">Maze Type</label>
+        <select id="mazeType">
+          <option value="figma">Figma Preset</option>
+          <option value="manual">Manual</option>
+          <option value="random">Random Solvable</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label for="mode">Mode</label>
         <select id="mode">
           <option value="2d">2D Matrix</option>
@@ -64,6 +73,11 @@
           min="0"
           value="6"
         />
+      </div>
+
+      <div class="field" id="manualInstructions" style="display:none;">
+        <label>Manual Mode</label>
+        <div style="font-size:13px;color:#374151;">Click cells to add/remove blocked nodes, then press Start.</div>
       </div>
 
       <div class="actions">
