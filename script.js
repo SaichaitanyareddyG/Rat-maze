@@ -47,7 +47,7 @@ const RatMazeApp = (() => {
 
   let maze = [];
   let mode = '2d';
-  let mazeType = 'figma';
+  let mazeType = 'manual';
   let size = 5;
   let depth = 1;
   let finalPath = [];
@@ -56,35 +56,20 @@ const RatMazeApp = (() => {
   let shouldStop = false;
   const STEP_DELAY = 2000; // 2000ms = 2 seconds per step
 
-  const FIGMA_2D_MAZE = [
-    [0, 1, 0, 0, 0],
-    [0, 0, 0, 1, 0],
-    [0, 1, 1, 0, 0],
-    [0, 1, 1, 0, 1],
-    [0, 1, 1, 0, 0]
-  ];
 
   function init() {
     bindEvents();
     toggleDepthInput();
-    // default to figma preset
-    dom.mazeType.value = 'figma';
-    mazeType = 'figma';
+    // default to manual mode
+    dom.mazeType.value = 'manual';
+    mazeType = 'manual';
     generateMaze();
   }
 
   function bindEvents() {
     dom.mode.addEventListener('change', () => {
       toggleDepthInput();
-      if (dom.mode.value === '3d' && dom.mazeType.value === 'figma') {
-        dom.mazeType.value = 'manual';
-        mazeType = 'manual';
-        dom.manualInstructions.style.display = 'block';
-        dom.sizeInput.disabled = false;
-        dom.depthInput.disabled = false;
-        dom.blockedInput.disabled = true;
-        setStatus('Figma Preset is 2D only. Switched to Manual 3D mode.');
-      }
+      // no special preset behavior; just regenerate
       generateMaze();
     });
 
@@ -94,18 +79,10 @@ const RatMazeApp = (() => {
       dom.manualInstructions.style.display =
         mazeType === 'manual' ? 'block' : 'none';
 
-      // Figma preset forces size 5 and single layer
-      if (mazeType === 'figma') {
-        dom.sizeInput.value = 5;
-        dom.sizeInput.disabled = true;
-        dom.depthInput.value = 1;
-        dom.depthInput.disabled = true;
-        dom.blockedInput.disabled = true;
-      } else {
-        dom.sizeInput.disabled = false;
-        dom.depthInput.disabled = false;
-        dom.blockedInput.disabled = true;
-      }
+      // Manual: user clicks to build walls; Random: allow blocked input
+      dom.sizeInput.disabled = false;
+      dom.depthInput.disabled = false;
+      dom.blockedInput.disabled = mazeType !== 'random';
 
       generateMaze();
     });
@@ -176,9 +153,7 @@ const RatMazeApp = (() => {
 
     resetFinalPath();
 
-    if (mazeType === 'figma' && mode === '2d') {
-      loadFigmaPresetMaze();
-    } else if (mazeType === 'random') {
+    if (mazeType === 'random') {
       const ok = generateSolvableRandomMaze(blocked);
       if (!ok) {
         setStatus('Failed to generate a solvable maze. Try different options.');
@@ -186,13 +161,6 @@ const RatMazeApp = (() => {
       }
     } else {
       // manual or default empty
-      if (mazeType === 'figma' && mode === '3d') {
-        mazeType = 'manual';
-        dom.mazeType.value = 'manual';
-        dom.manualInstructions.style.display = 'block';
-        dom.blockedInput.disabled = true;
-        setStatus('Figma Preset is 2D only. Switched to Manual 3D mode.');
-      }
       maze = createEmptyMaze();
       updateBlockedCountFromMaze();
     }
@@ -203,11 +171,10 @@ const RatMazeApp = (() => {
   }
 
   function loadFigmaPresetMaze() {
+    // removed: Figma preset no longer supported
     size = 5;
     depth = 1;
-    // deep copy into maze (layered format to keep 3D plumbing)
-    // keep 2D structure for 2D mode
-    maze = FIGMA_2D_MAZE.map((r) => r.slice());
+    maze = createEmptyMaze();
     updateBlockedCountFromMaze();
   }
 
