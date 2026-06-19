@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rat in a Maze Visualizer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Machine Coding Exercise</p>
+        <h1>Rat in a Maze</h1>
+        <p class="subtitle">DFS + Backtracking visualizer using Vanilla JavaScript</p>
+      </div>
+
+      <div class="legend">
+        <span><i class="box source"></i> Source</span>
+        <span><i class="box destination"></i> Destination</span>
+        <span><i class="box wall"></i> Wall</span>
+        <span><i class="box current"></i> Rat</span>
+        <span><i class="box visited"></i> Visited</span>
+        <span><i class="box backtracked"></i> Backtracked</span>
+      </div>
+    </section>
+
+    <section class="panel controls-panel">
+      <div class="field">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="2d">2D Matrix</option>
+          <option value="3d">3D Matrix Bonus</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="sizeInput">Matrix Size (N)</label>
+        <input
+          id="sizeInput"
+          type="number"
+          min="3"
+          max="10"
+          value="5"
+        />
+      </div>
+
+      <div class="field" id="depthField">
+        <label for="depthInput">Depth / Layers</label>
+        <input
+          id="depthInput"
+          type="number"
+          min="2"
+          max="5"
+          value="3"
+        />
+      </div>
+
+      <div class="field">
+        <label for="blockedInput">Blocked Nodes</label>
+        <input
+          id="blockedInput"
+          type="number"
+          min="0"
+          value="6"
+        />
+      </div>
+
+      <div class="actions">
+        <button id="generateBtn" class="secondary">
+          Generate Maze
+        </button>
+
+        <button id="startBtn" class="primary">
+          Start
+        </button>
+
+        <button id="pauseBtn" class="secondary" disabled>
+          Pause
+        </button>
+
+        <button id="restartBtn" class="danger">
+          Restart
+        </button>
+      </div>
+    </section>
+
+    <section class="panel status-panel">
+      <p id="statusText">
+        Configure the maze and click Generate Maze.
+      </p>
+    </section>
+
+    <section id="mazeWrapper" class="maze-wrapper"></section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
