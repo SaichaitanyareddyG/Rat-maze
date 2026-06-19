@@ -54,6 +54,7 @@ const RatMazeApp = (() => {
   let isRunning = false;
   let isPaused = false;
   let shouldStop = false;
+  const STEP_DELAY = 250;
 
   const FIGMA_2D_MAZE = [
     [0, 1, 0, 0, 0],
@@ -75,6 +76,15 @@ const RatMazeApp = (() => {
   function bindEvents() {
     dom.mode.addEventListener('change', () => {
       toggleDepthInput();
+      if (dom.mode.value === '3d' && dom.mazeType.value === 'figma') {
+        dom.mazeType.value = 'manual';
+        mazeType = 'manual';
+        dom.manualInstructions.style.display = 'block';
+        dom.sizeInput.disabled = false;
+        dom.depthInput.disabled = false;
+        dom.blockedInput.disabled = true;
+        setStatus('Figma Preset is 2D only. Switched to Manual 3D mode.');
+      }
       generateMaze();
     });
 
@@ -177,6 +187,13 @@ const RatMazeApp = (() => {
       }
     } else {
       // manual or default empty
+      if (mazeType === 'figma' && mode === '3d') {
+        mazeType = 'manual';
+        dom.mazeType.value = 'manual';
+        dom.manualInstructions.style.display = 'block';
+        dom.blockedInput.disabled = true;
+        setStatus('Figma Preset is 2D only. Switched to Manual 3D mode.');
+      }
       maze = createEmptyMaze();
     }
 
@@ -365,9 +382,9 @@ const RatMazeApp = (() => {
       // position relative so overlay can be absolute
       grid.style.position = 'relative';
 
-      // Better responsive sizing
+      // Fixed cell sizing to match CSS
       grid.style.gridTemplateColumns =
-        `repeat(${size}, minmax(38px, 48px))`;
+        `repeat(${size}, 52px)`;
 
       for (let row = 0; row < size; row += 1) {
         for (let col = 0; col < size; col += 1) {
@@ -392,22 +409,18 @@ const RatMazeApp = (() => {
       }
 
       // append grid first then overlay
-      layerCard.appendChild(grid);
-
-      // create SVG overlay placeholder
       const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       overlay.classList.add('path-overlay');
       overlay.setAttribute('width', '100%');
       overlay.setAttribute('height', '100%');
       overlay.setAttribute('preserveAspectRatio', 'none');
 
-      layerCard.appendChild(overlay);
-
+      grid.appendChild(overlay);
+      layerCard.appendChild(grid);
       dom.mazeWrapper.appendChild(layerCard);
 
-      // draw the path for this layer if available
-      const layerPath = getLayerPath(finalPath, layer);
-      drawPathOverlay(grid, overlay, layerPath);
+      const layerSegments = getLayerPathSegments(finalPath, layer);
+      drawPathOverlay(grid, overlay, layerSegments);
 
       // render layer transition badges for 3D paths
       if (finalPath && finalPath.length > 1) {
@@ -441,11 +454,11 @@ const RatMazeApp = (() => {
     }
 
     if (isSource(point)) {
-      return mazeType === 'figma' ? 'source' : 'source alt';
+      return 'source';
     }
 
     if (isDestination(point)) {
-      return mazeType === 'figma' ? 'destination' : 'destination alt';
+      return 'destination';
     }
 
     const value = getCell(point);
@@ -478,11 +491,11 @@ const RatMazeApp = (() => {
     }
 
     if (isSource(point)) {
-      return mazeType === 'figma' ? 'SOURCE' : 'S';
+      return 'S';
     }
 
     if (isDestination(point)) {
-      return mazeType === 'figma' ? 'DESTINATION' : 'D';
+      return 'D';
     }
 
     return '';
@@ -545,7 +558,7 @@ const RatMazeApp = (() => {
 
     setCell(point, CELL.VISITED);
     renderMaze(point);
-    await delay(2000);
+    await delay(STEP_DELAY);
 
     if (isDestination(point)) {
       markFinalPath([...path, point]);
@@ -573,7 +586,7 @@ const RatMazeApp = (() => {
     if (!isSource(point) && !isDestination(point)) {
       setCell(point, CELL.BACKTRACKED);
       renderMaze(point);
-      await delay(2000);
+      await delay(STEP_DELAY);
     }
 
     return false;
@@ -643,13 +656,41 @@ const RatMazeApp = (() => {
     finalPath = [];
   }
 
-  function getLayerPath(path, layer) {
+  function getLayerPathSegments(path, layer) {
     if (!path || !path.length) return [];
-    return path.filter((p) => p.layer === layer);
+
+    const segments = [];
+    let currentSegment = [];
+
+    for (let i = 0; i < path.length; i += 1) {
+      const point = path[i];
+      if (point.layer !== layer) {
+        if (currentSegment.length) {
+          segments.push(currentSegment);
+          currentSegment = [];
+        }
+        continue;
+      }
+
+      currentSegment.push(point);
+    }
+
+    if (currentSegment.length) {
+      segments.push(currentSegment);
+    }
+
+    return segments;
   }
 
   function toggleManualWall(point) {
     if (isSource(point) || isDestination(point)) return;
+
+    forEachPoint((p) => {
+      const value = getCell(p);
+      if ([CELL.VISITED, CELL.BACKTRACKED].includes(value)) {
+        setCell(p, CELL.OPEN);
+      }
+    });
 
     const cur = getCell(point);
     if (cur === CELL.WALL) {
@@ -657,65 +698,68 @@ const RatMazeApp = (() => {
     } else {
       setCell(point, CELL.WALL);
     }
+
+    resetFinalPath();
+    renderMaze();
   }
 
-  function drawPathOverlay(grid, svg, pathPoints) {
-    // clear existing
+  function drawPathOverlay(grid, svg, layerSegments) {
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-    if (!pathPoints || pathPoints.length === 0) return;
+    if (!Array.isArray(layerSegments) || layerSegments.length === 0) return;
 
-    // map points to center coordinates relative to grid
     const rect = grid.getBoundingClientRect();
     const cells = Array.from(grid.querySelectorAll('.cell'));
+    const width = rect.width || grid.clientWidth || 300;
+    const height = rect.height || grid.clientHeight || 300;
 
-    const coords = pathPoints.map((p) => {
-      const idx = p.row * size + p.col;
-      const el = cells[idx];
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      return {
-        x: r.left - rect.left + r.width / 2,
-        y: r.top - rect.top + r.height / 2
-      };
-    }).filter(Boolean);
-
-    if (coords.length < 2) return;
-
-    // convert to SVG viewBox coordinates
-    const w = rect.width || grid.clientWidth || 300;
-    const h = rect.height || grid.clientHeight || 300;
-    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    svg.style.width = `${w}px`;
-    svg.style.height = `${h}px`;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.style.width = `${width}px`;
+    svg.style.height = `${height}px`;
 
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-    marker.setAttribute('id', 'arrow');
-    marker.setAttribute('markerWidth', '10');
-    marker.setAttribute('markerHeight', '10');
-    marker.setAttribute('refX', '8');
-    marker.setAttribute('refY', '5');
-    marker.setAttribute('orient', 'auto');
-    const pathArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    pathArrow.setAttribute('d', 'M0,0 L10,5 L0,10 z');
-    pathArrow.setAttribute('fill', '#f97316');
-    marker.appendChild(pathArrow);
-    defs.appendChild(marker);
     svg.appendChild(defs);
 
-    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke', '#f97316');
-    poly.setAttribute('stroke-width', '6');
-    poly.setAttribute('stroke-linecap', 'round');
-    poly.setAttribute('stroke-linejoin', 'round');
-    poly.setAttribute('marker-end', 'url(#arrow)');
+    layerSegments.forEach((segment, index) => {
+      if (!segment || segment.length < 2) return;
 
-    const pointsAttr = coords.map((c) => `${c.x},${c.y}`).join(' ');
-    poly.setAttribute('points', pointsAttr);
+      const points = segment
+        .map((p) => {
+          const idx = p.row * size + p.col;
+          const el = cells[idx];
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return `${r.left - rect.left + r.width / 2},${r.top - rect.top + r.height / 2}`;
+        })
+        .filter(Boolean);
 
-    svg.appendChild(poly);
+      if (points.length < 2) return;
+
+      const markerId = `arrow-${grid.dataset.layer}-${index}`;
+      const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+      marker.setAttribute('id', markerId);
+      marker.setAttribute('markerWidth', '10');
+      marker.setAttribute('markerHeight', '10');
+      marker.setAttribute('refX', '8');
+      marker.setAttribute('refY', '5');
+      marker.setAttribute('orient', 'auto');
+      marker.setAttribute('markerUnits', 'strokeWidth');
+      const pathArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      pathArrow.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+      pathArrow.setAttribute('fill', '#f97316');
+      marker.appendChild(pathArrow);
+      defs.appendChild(marker);
+
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', '#f97316');
+      poly.setAttribute('stroke-width', '5');
+      poly.setAttribute('stroke-linecap', 'round');
+      poly.setAttribute('stroke-linejoin', 'round');
+      poly.setAttribute('marker-end', `url(#${markerId})`);
+      poly.setAttribute('points', points.join(' '));
+      svg.appendChild(poly);
+    });
   }
 
   function forEachPoint(callback) {

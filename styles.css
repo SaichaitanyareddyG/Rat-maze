@@ -160,58 +160,52 @@ button:disabled {
 
 .grid {
   display: grid;
-  gap: 4px;
+  gap: 0;
   width: fit-content;
   max-width: 100%;
-  overflow: auto;
-}
-
-.cell {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  border: 1px solid #111827;
-  background: #ffffff;
-  font-size: 13px;
-  font-weight: 700;
-  transition: background 0.2s ease, transform 0.2s ease;
+  overflow: visible;
+  border: 2px solid #111827;
   position: relative;
 }
 
-
-.source {
+.cell {
+  width: 52px;
+  height: 52px;
+  border-radius: 0;
+  border: 1px solid #111827;
   background: #ffffff;
-  color: #f97316;
-  font-size: 11px;
-  text-align: center;
+  color: #111827;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  user-select: none;
 }
 
+.source,
 .destination {
   background: #ffffff;
   color: #f97316;
-  font-size: 11px;
-  text-align: center;
+  font-weight: 900;
 }
 
-.source.alt {
-  background: #22c55e;
-  color: #ffffff;
+.source {
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
-.destination.alt {
-  background: #ef4444;
-  color: #ffffff;
+.destination {
+  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .wall {
-<<<<<<< HEAD
-  background: #252525;
-=======
-  background: #000000;
->>>>>>> 821fcd9 (feat: Figma preset maze, Maze Type control, manual/random modes, SVG orange path overlay, 3D badges, and CSS updates)
+  background: #000000 !important;
   color: #ffffff;
 }
 
@@ -238,6 +232,7 @@ button:disabled {
   height: 100%;
   pointer-events: none;
   z-index: 5;
+  overflow: visible;
 }
 
 .layer-badge {
