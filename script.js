@@ -104,7 +104,7 @@ const RatMazeApp = (() => {
       } else {
         dom.sizeInput.disabled = false;
         dom.depthInput.disabled = false;
-        dom.blockedInput.disabled = mazeType !== 'random';
+        dom.blockedInput.disabled = true;
       }
 
       generateMaze();
@@ -122,7 +122,6 @@ const RatMazeApp = (() => {
 
       const point = { layer, row, col };
       toggleManualWall(point);
-      renderMaze();
     });
 
     dom.generateBtn.addEventListener('click', generateMaze);
@@ -195,6 +194,7 @@ const RatMazeApp = (() => {
         setStatus('Figma Preset is 2D only. Switched to Manual 3D mode.');
       }
       maze = createEmptyMaze();
+      updateBlockedCountFromMaze();
     }
 
     renderMaze();
@@ -208,6 +208,7 @@ const RatMazeApp = (() => {
     // deep copy into maze (layered format to keep 3D plumbing)
     // keep 2D structure for 2D mode
     maze = FIGMA_2D_MAZE.map((r) => r.slice());
+    updateBlockedCountFromMaze();
   }
 
   function generateSolvableRandomMaze(blockedCount) {
@@ -223,6 +224,7 @@ const RatMazeApp = (() => {
       if (path) {
         // keep this maze and mark finalPath now (but final overlay will be created on render)
         finalPath = [];
+        updateBlockedCountFromMaze();
         return true;
       }
     }
@@ -382,9 +384,8 @@ const RatMazeApp = (() => {
       // position relative so overlay can be absolute
       grid.style.position = 'relative';
 
-      // Fixed cell sizing to match CSS
-      grid.style.gridTemplateColumns =
-        `repeat(${size}, 52px)`;
+      // Set CSS variable for maze size
+      grid.style.setProperty('--maze-size', size);
 
       for (let row = 0; row < size; row += 1) {
         for (let col = 0; col < size; col += 1) {
@@ -487,7 +488,7 @@ const RatMazeApp = (() => {
       currentPoint &&
       isSamePoint(point, currentPoint)
     ) {
-      return '🐭';
+      return 'R';
     }
 
     if (isSource(point)) {
@@ -512,6 +513,7 @@ const RatMazeApp = (() => {
     dom.pauseBtn.disabled = false;
     dom.pauseBtn.textContent = 'Pause';
 
+    resetFinalPath();
     resetVisitedCells();
 
     setStatus(
@@ -700,7 +702,22 @@ const RatMazeApp = (() => {
     }
 
     resetFinalPath();
+    updateBlockedCountFromMaze();
     renderMaze();
+  }
+
+  function countWalls() {
+    let count = 0;
+    forEachPoint((point) => {
+      if (getCell(point) === CELL.WALL) {
+        count += 1;
+      }
+    });
+    return count;
+  }
+
+  function updateBlockedCountFromMaze() {
+    dom.blockedInput.value = countWalls();
   }
 
   function drawPathOverlay(grid, svg, layerSegments) {
@@ -738,14 +755,15 @@ const RatMazeApp = (() => {
       const markerId = `arrow-${grid.dataset.layer}-${index}`;
       const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
       marker.setAttribute('id', markerId);
-      marker.setAttribute('markerWidth', '10');
-      marker.setAttribute('markerHeight', '10');
-      marker.setAttribute('refX', '8');
-      marker.setAttribute('refY', '5');
+      marker.setAttribute('markerUnits', 'userSpaceOnUse');
+      marker.setAttribute('markerWidth', '14');
+      marker.setAttribute('markerHeight', '14');
+      marker.setAttribute('viewBox', '0 0 14 14');
+      marker.setAttribute('refX', '12');
+      marker.setAttribute('refY', '7');
       marker.setAttribute('orient', 'auto');
-      marker.setAttribute('markerUnits', 'strokeWidth');
       const pathArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      pathArrow.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+      pathArrow.setAttribute('d', 'M1,1 L13,7 L1,13 Z');
       pathArrow.setAttribute('fill', '#f97316');
       marker.appendChild(pathArrow);
       defs.appendChild(marker);
@@ -753,7 +771,7 @@ const RatMazeApp = (() => {
       const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       poly.setAttribute('fill', 'none');
       poly.setAttribute('stroke', '#f97316');
-      poly.setAttribute('stroke-width', '5');
+      poly.setAttribute('stroke-width', '4');
       poly.setAttribute('stroke-linecap', 'round');
       poly.setAttribute('stroke-linejoin', 'round');
       poly.setAttribute('marker-end', `url(#${markerId})`);

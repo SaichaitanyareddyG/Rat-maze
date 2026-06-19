@@ -141,8 +141,10 @@ button:disabled {
 }
 
 .maze-wrapper {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 18px;
+  align-items: flex-start;
 }
 
 .layer-card {
@@ -151,6 +153,8 @@ button:disabled {
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  width: fit-content;
+  max-width: 100%;
 }
 
 .layer-title {
@@ -159,28 +163,33 @@ button:disabled {
 }
 
 .grid {
+  --cell-size: 52px;
   display: grid;
+  grid-template-columns: repeat(var(--maze-size), var(--cell-size));
   gap: 0;
   width: fit-content;
   max-width: 100%;
   overflow: visible;
-  border: 2px solid #111827;
   position: relative;
+  border-top: 2px solid #111827;
+  border-left: 2px solid #111827;
 }
 
 .cell {
-  width: 52px;
-  height: 52px;
+  width: var(--cell-size);
+  height: var(--cell-size);
+  border: 0;
+  border-right: 2px solid #111827;
+  border-bottom: 2px solid #111827;
   border-radius: 0;
-  border: 1px solid #111827;
   background: #ffffff;
   color: #111827;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 4px;
-  font-size: 12px;
-  font-weight: 800;
+  padding: 6px;
+  font-size: 16px;
+  font-weight: 900;
   line-height: 1;
   position: relative;
   z-index: 1;
@@ -256,9 +265,12 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .grid {
+    --cell-size: 38px;
+  }
+
   .cell {
-    width: 38px;
-    height: 38px;
-    font-size: 11px;
+    font-size: 12px;
+    padding: 4px;
   }
 }
