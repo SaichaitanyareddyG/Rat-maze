@@ -204,14 +204,10 @@ button:disabled {
   font-weight: 900;
 }
 
-.source {
-  align-items: flex-start;
-  justify-content: flex-start;
-}
-
+.source,
 .destination {
-  align-items: flex-end;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
 }
 
 .wall {
